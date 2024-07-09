@@ -1,39 +1,39 @@
+import { UseGuards } from '@nestjs/common';
 import {
-  Resolver,
-  Mutation,
-  Query,
   Args,
-  ResolveField,
+  Mutation,
   Parent,
+  Query,
+  ResolveField,
+  Resolver,
   ResolveReference,
 } from '@nestjs/graphql';
 import { ObjectId } from 'mongodb';
 import {
-  ChatMessage,
-  PaginatedChatMessages,
-  Poll,
-  RichMessageContent,
-} from './models/message.entity';
-import {
-  MessageDto,
-  GetMessageDto,
-  DeleteMessageDto,
-  LikeMessageDto,
-  ResolveMessageDto,
-  ReactionDto,
-} from './models/message.dto';
-import { MessageLogic } from './message.logic';
-import {
   GqlAuthGuard,
   GqlAuthGuardForReference,
 } from '../authentication/GqlAuthGuard';
-import { UseGuards } from '@nestjs/common';
 import {
   AuthenticatedUser,
   IAuthenticatedUser,
 } from '../authentication/jwt.strategy';
 import { SafeguardingService } from '../safeguarding/safeguarding.service';
 import { ChatMessageDataLoader } from './message.dataloader';
+import { MessageLogic } from './message.logic';
+import {
+  DeleteMessageDto,
+  GetMessageDto,
+  LikeMessageDto,
+  MessageDto,
+  ReactionDto,
+  ResolveMessageDto,
+} from './models/message.dto';
+import {
+  ChatMessage,
+  PaginatedChatMessages,
+  Poll,
+  RichMessageContent,
+} from './models/message.entity';
 
 type ChatMessageReference = { __typename: string; id: ObjectId };
 
@@ -129,7 +129,7 @@ export class MessageResolver {
     @Args('likeMessageDto') likeMessageDto: LikeMessageDto,
     @AuthenticatedUser() authenticatedUser: IAuthenticatedUser,
   ): Promise<ChatMessage> {
-    await this.messageLogic.like(likeMessageDto, authenticatedUser);
+    return await this.messageLogic.like(likeMessageDto, authenticatedUser);
   }
 
   @Mutation(() => ChatMessage)
