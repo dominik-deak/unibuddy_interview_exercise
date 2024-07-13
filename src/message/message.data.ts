@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ObjectID } from 'mongodb';
 import { FilterQuery, Model } from 'mongoose';
+import { MessageGroupedByConversationOutput } from '../conversation/models/messagesFilterInput';
+import { GetMessageDto, MessageDto } from './models/message.dto';
+import { ChatMessage, PaginatedChatMessages } from './models/message.entity';
 import {
   ChatMessageDocument,
-  chatMessageToObject,
   ChatMessageModel,
+  chatMessageToObject,
 } from './models/message.model';
-import { ChatMessage, PaginatedChatMessages } from './models/message.entity';
-import { MessageDto, GetMessageDto } from './models/message.dto';
-import { ObjectID } from 'mongodb';
 import { createRichContent } from './utils/message.helper';
-import { MessageGroupedByConversationOutput } from '../conversation/models/messagesFilterInput';
 
 @Injectable()
 export class MessageData {
@@ -41,7 +41,6 @@ export class MessageData {
     if (!message) throw new Error('Message not found');
     return chatMessageToObject(message);
   }
-
 
   async getChatConversationMessages(
     data: GetMessageDto,
@@ -88,8 +87,11 @@ export class MessageData {
   }
 
   async delete(messageId: ObjectID): Promise<ChatMessage> {
-    // TODO allow a message to be marked as deleted
-    return new ChatMessage() // Minimum to pass ts checks -replace this
+    const message = await this.chatMessageModel.findById(messageId);
+    if (!message) throw new Error('Message not found');
+    message.deleted = true;
+    await message.save();
+    return chatMessageToObject(message);
   }
 
   async resolve(messageId: ObjectID): Promise<ChatMessage> {
