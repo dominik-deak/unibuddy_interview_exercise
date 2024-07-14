@@ -1,20 +1,20 @@
-import { ConversationLogic } from './../conversation/conversation.logic';
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
-import { UserBlocksLogic } from '../user-blocks/user-blocks.logic';
 import { IAuthenticatedUser } from '../authentication/jwt.strategy';
 import {
   extractUniversityIdsFromContext,
   getUniversityContexts,
 } from '../conversation/extractUniversityIdsFromContext';
-import { ChatConversationModel } from '../conversation/models/conversation.model';
-import { ChatMessageModel } from '../message/models/message.model';
-import { ConditionField } from './models/permissions.model';
 import {
   ContextSchema,
   ContextType,
 } from '../conversation/models/ContextSchema.dto';
+import { ChatConversationModel } from '../conversation/models/conversation.model';
+import { ChatMessageModel } from '../message/models/message.model';
 import { UserBlockScope } from '../user-blocks/models/user-blocks.model';
+import { UserBlocksLogic } from '../user-blocks/user-blocks.logic';
+import { ConversationLogic } from './../conversation/conversation.logic';
+import { ConditionField } from './models/permissions.model';
 
 @Injectable()
 export class AbilityFactory {
@@ -45,12 +45,13 @@ export class AbilityFactory {
 
   async factory(
     user: IAuthenticatedUser,
-    conversation: ChatConversationModel,
+    conversation: ChatConversationModel | null,
     message?: ChatMessageModel,
   ) {
     if (!conversation) {
       return [];
     }
+
     const {
       id,
       permissions = [],
@@ -58,7 +59,6 @@ export class AbilityFactory {
       blockedMemberIds,
       context,
     } = conversation;
-
 
     const userBlockScopes: UserBlockScope[] = getUniversityContexts(
       context,

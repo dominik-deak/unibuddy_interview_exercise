@@ -1,9 +1,7 @@
 import { Ability, subject } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
-
 import { IAuthenticatedUser } from '../authentication/jwt.strategy';
 import { ConversationData } from '../conversation/conversation.data';
-
 import { MessageData } from '../message/message.data';
 import { AbilityFactory } from './ability-factory';
 import { Action, Subject } from './models/permissions.model';
@@ -14,6 +12,7 @@ type AuthenticatedUser = {
   universityId?: string;
   marketplaceId?: string;
 };
+
 @Injectable()
 export class PermissionsService {
   constructor(
@@ -31,18 +30,22 @@ export class PermissionsService {
       marketplaceId: marketplaceId ? String(marketplaceId) : undefined,
     };
   }
+
   async conversationPermissions({
     user,
-    conversationId,
     action,
+    conversationId,
   }: {
     user: IAuthenticatedUser;
-    conversationId: string;
+    conversationId?: string;
     action: Action;
   }): Promise<boolean> {
-    const conversation = await this.conversationData.getConversation(
-      conversationId,
-    );
+    let conversation = null;
+    if (conversationId) {
+      conversation = await this.conversationData.getConversation(
+        conversationId,
+      );
+    }
 
     const ability = new Ability(
       await this.abilityFactory.factory(user, conversation),

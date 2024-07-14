@@ -1,8 +1,8 @@
-import { Document } from 'mongoose';
+import { Field, ObjectType } from '@nestjs/graphql';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ObjectID } from 'mongodb';
+import { Document } from 'mongoose';
 import { AttachmentType, GifType } from './message.dto';
-import { Field, ObjectType } from '@nestjs/graphql';
 
 @Schema()
 export class ReplyMessage {
@@ -154,6 +154,10 @@ export class ChatMessageModel {
   })
   reactions?: Reaction[];
 
+  // New prop for tagging feature
+  @Prop({ type: [String], default: [] })
+  tags: string[];
+
   /**
    * All the properties below are virtual properties
    * @url https://mongoosejs.com/docs/tutorials/virtuals.html
@@ -182,7 +186,7 @@ ChatMessageSchema.virtual('sender').get(function (this: ChatMessageDocument) {
   return { id: String(this.senderId) };
 });
 
-ChatMessageSchema.index({ conversationId: 1, created: -1, _id: -1 });
+ChatMessageSchema.index({ conversationId: 1, created: -1, _id: -1, tags: 1 }); // indexed tags
 
 export function chatMessageToObject(
   doc: ChatMessageDocument,

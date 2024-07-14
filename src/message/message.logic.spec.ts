@@ -1,14 +1,7 @@
-import { ContextSchema } from './../conversation/models/ContextSchema.dto';
 import { Test, TestingModule } from '@nestjs/testing';
-import { MessageLogic } from './message.logic';
-import { MessageData } from './message.data';
-import {
-  AttachmentType,
-  GetMessageDto,
-  GifType,
-  MessageDto,
-  PollDto,
-} from './models/message.dto';
+import { ForbiddenError } from 'apollo-server-errors';
+import { ObjectID, ObjectId } from 'mongodb';
+import { IAuthenticatedUser } from '../authentication/jwt.strategy';
 import {
   ConversationChannel,
   DeleteMessageEvent,
@@ -20,46 +13,53 @@ import {
   UnlikeMessageEvent,
   UnresolveMessageEvent,
 } from '../conversation/conversation-channel.socket';
-import { PermissionsService } from '../permissions/permissions.service';
-import { ObjectID, ObjectId } from 'mongodb';
-import { ForbiddenError } from 'apollo-server-errors';
-import { IAuthenticatedUser } from '../authentication/jwt.strategy';
-import { UserService } from '../user/user.service';
 import { ConversationData } from '../conversation/conversation.data';
-import { ChatConversationModel } from '../conversation/models/conversation.model';
-import {
-  Context,
-  ContextType,
-  Product,
-} from '../conversation/models/ContextSchema.dto';
-import { ChatMessageModel } from './models/message.model';
-import { SafeguardingService } from '../safeguarding/safeguarding.service';
-import {
-  IUserBlocksLogic,
-  UserBlocksLogic,
-} from '../user-blocks/user-blocks.logic';
-import {
-  UserBlockScope,
-  UserBlockDTo,
-} from '../user-blocks/models/user-blocks.model';
-import { PaginatedChatMessages } from './models/message.entity';
 import {
   ConversationDTO,
   ConversationLogic,
 } from '../conversation/conversation.logic';
 import { AddMemberDTO } from '../conversation/models/AddMember.dto';
-import { LastRead } from '../conversation/models/LastRead.entity';
 import {
-  UnreadCountInput,
-  UnreadCountOutput,
-} from '../conversation/models/unreadCount.dto';
+  Context,
+  ContextType,
+  Product,
+} from '../conversation/models/ContextSchema.dto';
+import { ChatConversationModel } from '../conversation/models/conversation.model';
+import { Tag } from '../conversation/models/CreateChatConversation.dto';
 import {
   LastMessageInput,
   LastMessageOutput,
 } from '../conversation/models/lastMessage.dto';
-import { Permission } from '../conversation/models/Permission.dto';
+import { LastRead } from '../conversation/models/LastRead.entity';
 import { LastReadInput } from '../conversation/models/LastReadInput.dto';
-import { Tag } from '../conversation/models/CreateChatConversation.dto';
+import { Permission } from '../conversation/models/Permission.dto';
+import {
+  UnreadCountInput,
+  UnreadCountOutput,
+} from '../conversation/models/unreadCount.dto';
+import { PermissionsService } from '../permissions/permissions.service';
+import { SafeguardingService } from '../safeguarding/safeguarding.service';
+import {
+  UserBlockDTo,
+  UserBlockScope,
+} from '../user-blocks/models/user-blocks.model';
+import {
+  IUserBlocksLogic,
+  UserBlocksLogic,
+} from '../user-blocks/user-blocks.logic';
+import { UserService } from '../user/user.service';
+import { ContextSchema } from './../conversation/models/ContextSchema.dto';
+import { MessageData } from './message.data';
+import { MessageLogic } from './message.logic';
+import {
+  AttachmentType,
+  GetMessageDto,
+  GifType,
+  MessageDto,
+  PollDto,
+} from './models/message.dto';
+import { PaginatedChatMessages } from './models/message.entity';
+import { ChatMessageModel } from './models/message.model';
 
 const UNAUTHORISED_USER = new ObjectId('321b1a570ff321b1a570ff01');
 const validUser: IAuthenticatedUser = {
@@ -132,6 +132,7 @@ const replyMessageModel: ChatMessageModel = {
   resolved: false,
   likes: [],
   likesCount: 0,
+  tags: [], // Added tags field
 };
 
 const USER_BLOCK_DTO = {
@@ -150,33 +151,36 @@ describe('MessageLogic', () => {
   let permissionsService: PermissionsService;
 
   const mockCreatedMessage = {
-    _id: messageId,
+    id: messageId,
     text: 'Message 1',
     senderId,
     conversationId,
     created: new Date('2018-05-11T17:47:40.893Z'),
     sender: { id: '5fe0cce861c8ea54018385af' },
     conversation: { id: '5fe0cce861c8ea54018385ae' },
-    id: messageId,
     deleted: false,
     resolved: false,
     likes: [],
     likesCount: 0,
+    tags: [], // Added tags field
   };
 
   const mockGifMessage = {
     ...mockCreatedMessage,
     richContent: mockGiphyContent,
+    tags: [], // Added tags field
   };
 
   const mockPollMessage = {
     ...mockCreatedMessage,
     richContent: mockPollContentWithSingleOption,
+    tags: [], // Added tags field
   };
 
   const mockPollMessageWithOptionSelected = {
     ...mockCreatedMessage,
     richContent: mockPollContentWithOptionBurgerSelected,
+    tags: [], // Added tags field
   };
 
   const replyMessage = {
@@ -198,6 +202,7 @@ describe('MessageLogic', () => {
         richContent: mockGiphyContent,
       },
     },
+    tags: [], // Include tags field
   };
 
   const mockUser = {
@@ -338,6 +343,7 @@ describe('MessageLogic', () => {
           likes: [],
           likesCount: 0,
           isSenderBlocked: false,
+          tags: [], // Include tags field
         },
 
         {
@@ -354,10 +360,11 @@ describe('MessageLogic', () => {
           likes: [],
           likesCount: 0,
           isSenderBlocked: false,
+          tags: [], // Include tags field
         },
       ];
 
-      //limitted data based on given limit in pagination
+      // Limited data based on given limit in pagination
       const messages = allMessages.slice(
         0,
         Math.min(data.limit, allMessages.length),
@@ -412,6 +419,40 @@ describe('MessageLogic', () => {
       return Promise.resolve(
         this.getMockMessage(messageId.toHexString(), userId.toHexString()),
       );
+    }
+
+    addTags(messageId: ObjectID, tags: string[]) {
+      const message = this.getMockMessage(
+        messageId.toHexString(),
+        senderId.toHexString(),
+      );
+      return Promise.resolve({
+        ...message,
+        tags,
+      });
+    }
+
+    updateTags(messageId: ObjectID, tags: string[]) {
+      const message = this.getMockMessage(
+        messageId.toHexString(),
+        senderId.toHexString(),
+      );
+      return Promise.resolve({
+        ...message,
+        tags,
+      });
+    }
+
+    searchMessagesByTags(tags: string[]) {
+      return Promise.resolve([
+        {
+          ...this.getMockMessage(
+            messageId.toHexString(),
+            senderId.toHexString(),
+          ),
+          tags,
+        },
+      ]);
     }
   }
 
@@ -549,7 +590,6 @@ describe('MessageLogic', () => {
   class MockConversationChannel {
     send = jest.fn();
   }
-
 
   class MockUserBlocksLogic implements IUserBlocksLogic {
     getBlockedUsers(
@@ -1444,6 +1484,46 @@ describe('MessageLogic', () => {
       await expect(
         messageLogic.removeVote(messageId, option, validUser),
       ).rejects.toEqual(expectedError);
+    });
+  });
+
+  // New functions for tagging feature
+
+  describe('addTags', () => {
+    it('should throw an error if the user is not authenticated', async () => {
+      const tags = ['tag1', 'tag2'];
+      await expect(
+        messageLogic.addTags(messageId, tags, {
+          ...validUser,
+          userId: UNAUTHORISED_USER,
+        }),
+      ).rejects.toThrow(new ForbiddenError('User is not authenticated'));
+    });
+  });
+
+  describe('updateTags', () => {
+    it('should throw an error if the user is not authenticated for updateTags', async () => {
+      const tags = ['tag1', 'tag2'];
+      await expect(
+        messageLogic.updateTags(messageId, tags, {
+          ...validUser,
+          userId: UNAUTHORISED_USER,
+        }),
+      ).rejects.toThrow(new ForbiddenError('User is not authenticated'));
+    });
+  });
+
+  describe('searchMessagesByTags', () => {
+    it('should throw an error if the user is not authenticated for searchMessagesByTags', async () => {
+      const tags = ['tag1', 'tag2'];
+      await expect(
+        messageLogic.searchMessagesByTags(tags, {
+          ...validUser,
+          userId: UNAUTHORISED_USER,
+        }),
+      ).rejects.toThrow(
+        new ForbiddenError('User is not authorized to search messages by tags'),
+      );
     });
   });
 });

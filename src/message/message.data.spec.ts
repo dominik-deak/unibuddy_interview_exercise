@@ -79,6 +79,7 @@ describe('MessageData', () => {
         conversation: { id: conversationId.toHexString() },
         likesCount: 0,
         sender: { id: senderId.toHexString() },
+        tags: [],
       });
     });
   });
@@ -111,17 +112,66 @@ describe('MessageData', () => {
         senderId,
       );
 
-      // Make sure that it started off as not deleted
       expect(message.deleted).toEqual(false);
 
       const deletedMessage = await messageData.delete(new ObjectID(message.id));
       expect(deletedMessage.deleted).toEqual(true);
 
-      // And that is it now deleted
       const retrievedMessage = await messageData.getMessage(
         message.id.toHexString(),
       );
       expect(retrievedMessage.deleted).toEqual(true);
+    });
+  });
+
+  // New tests for tagging feature
+
+  describe('tags', () => {
+    it('should add tags to a message', async () => {
+      const message = await messageData.create(
+        { conversationId, text: 'Hello world' },
+        senderId,
+      );
+
+      const updatedMessage = await messageData.addTags(message.id, [
+        'tag1',
+        'tag2',
+      ]);
+      expect(updatedMessage.tags).toContain('tag1');
+      expect(updatedMessage.tags).toContain('tag2');
+    });
+
+    it('should update tags on a message', async () => {
+      const message = await messageData.create(
+        { conversationId, text: 'Hello world' },
+        senderId,
+      );
+
+      const updatedMessage = await messageData.updateTags(message.id, [
+        'tag3',
+        'tag4',
+      ]);
+      expect(updatedMessage.tags).toContain('tag3');
+      expect(updatedMessage.tags).toContain('tag4');
+      expect(updatedMessage.tags).not.toContain('tag1');
+    });
+
+    it('should search messages by tags', async () => {
+      const message1 = await messageData.create(
+        { conversationId, text: 'Message 1' },
+        senderId,
+      );
+      await messageData.addTags(message1.id, ['tag1']);
+
+      const message2 = await messageData.create(
+        { conversationId, text: 'Message 2' },
+        sender2Id,
+      );
+      await messageData.addTags(message2.id, ['tag2']);
+
+      const results = await messageData.searchMessagesByTags(['tag1']);
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toEqual(message1.id);
     });
   });
 });

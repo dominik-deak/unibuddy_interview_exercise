@@ -1,52 +1,52 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenError } from 'apollo-server-errors';
+import { ObjectID } from 'mongodb';
+import { Types } from 'mongoose';
+import { IAuthenticatedUser } from '../authentication/jwt.strategy';
+import {
+  ConversationChannel,
+  DeleteMessageEvent,
+  LikeMessageEvent,
+  ReactedMessageEvent,
+  ResolveMessageEvent,
+  SendMessageEvent,
+  UnlikeMessageEvent,
+  UnReactedMessageEvent,
+  UnresolveMessageEvent,
+} from '../conversation/conversation-channel.socket';
+import { ConversationData } from '../conversation/conversation.data';
+import { ConversationLogic } from '../conversation/conversation.logic';
+import { extractUniversityIdsFromContext } from '../conversation/extractUniversityIdsFromContext';
+import {
+  ContextSchema,
+  ContextType,
+} from '../conversation/models/ContextSchema.dto';
+import {
+  MessageGroupedByConversationOutput,
+  MessagesFilterInput,
+} from '../conversation/models/messagesFilterInput';
+import { Action } from '../permissions/models/permissions.model';
+import { PermissionsService } from '../permissions/permissions.service';
+import { SafeguardingService } from '../safeguarding/safeguarding.service';
+import { UserBlocksLogic } from '../user-blocks/user-blocks.logic';
+import { UserService } from '../user/user.service';
+import { MessageData } from './message.data';
+import {
+  DeleteMessageDto,
+  GetMessageDto,
+  LikeMessageDto,
+  MessageDto,
+  PollOptionDto,
+  ReactionDto,
+  ResolveMessageDto,
+} from './models/message.dto';
 import {
   ChatMessage,
   PaginatedChatMessages,
   PollOption,
   RichMessageContent,
 } from './models/message.entity';
-import {
-  MessageDto,
-  GetMessageDto,
-  DeleteMessageDto,
-  LikeMessageDto,
-  ResolveMessageDto,
-  ReactionDto,
-  PollOptionDto,
-} from './models/message.dto';
-import { MessageData } from './message.data';
-import { IAuthenticatedUser } from '../authentication/jwt.strategy';
-import { ForbiddenError } from 'apollo-server-errors';
-import { PermissionsService } from '../permissions/permissions.service';
-import { Action } from '../permissions/models/permissions.model';
-import {
-  ConversationChannel,
-  SendMessageEvent,
-  DeleteMessageEvent,
-  LikeMessageEvent,
-  UnlikeMessageEvent,
-  ResolveMessageEvent,
-  UnresolveMessageEvent,
-  ReactedMessageEvent,
-  UnReactedMessageEvent,
-} from '../conversation/conversation-channel.socket';
-import { UserService } from '../user/user.service';
-import { ConversationData } from '../conversation/conversation.data';
-import { SafeguardingService } from '../safeguarding/safeguarding.service';
-import { Types } from 'mongoose';
-import { ObjectID } from 'mongodb';
-import { ConversationLogic } from '../conversation/conversation.logic';
-import { UserBlocksLogic } from '../user-blocks/user-blocks.logic';
-import {
-  ContextSchema,
-  ContextType,
-} from '../conversation/models/ContextSchema.dto';
-import { extractUniversityIdsFromContext } from '../conversation/extractUniversityIdsFromContext';
 import { ChatMessageModel } from './models/message.model';
-import {
-  MessageGroupedByConversationOutput,
-  MessagesFilterInput,
-} from '../conversation/models/messagesFilterInput';
 
 export interface IMessageLogic {
   create(
@@ -278,7 +278,6 @@ export class MessageLogic implements IMessageLogic {
     return blockedUsers.map((user) => user.blockedUserId);
   }
 
-
   async getChatConversationMessages(
     getMessageDto: GetMessageDto,
     authenticatedUser: IAuthenticatedUser,
@@ -313,7 +312,6 @@ export class MessageLogic implements IMessageLogic {
       paginatedChatMessages,
       blockedUserIds,
     );
-  
 
     return paginatedChatMessages;
   }
@@ -696,5 +694,49 @@ export class MessageLogic implements IMessageLogic {
     }
 
     return pollOption;
+  }
+
+  // New functions for tagging feature
+
+  async addTags(
+    messageId: ObjectID,
+    tags: string[],
+    authenticatedUser: IAuthenticatedUser,
+  ): Promise<ChatMessage> {
+    if (!authenticatedUser) {
+      throw new ForbiddenError('User is not authenticated');
+    }
+    const message = await this.messageData.addTags(messageId, tags);
+    return message;
+  }
+
+  async updateTags(
+    messageId: ObjectID,
+    tags: string[],
+    authenticatedUser: IAuthenticatedUser,
+  ): Promise<ChatMessage> {
+    if (!authenticatedUser) {
+      throw new ForbiddenError('User is not authenticated');
+    }
+    const message = await this.messageData.updateTags(messageId, tags);
+    return message;
+  }
+
+  async searchMessagesByTags(
+    tags: string[],
+    authenticatedUser: IAuthenticatedUser,
+  ): Promise<ChatMessage[]> {
+    if (
+      !(await this.permissions.conversationPermissions({
+        user: authenticatedUser,
+        action: Action.readConversation,
+      }))
+    ) {
+      throw new ForbiddenError(
+        'User is not authorized to search messages by tags',
+      );
+    }
+
+    return this.messageData.searchMessagesByTags(tags);
   }
 }

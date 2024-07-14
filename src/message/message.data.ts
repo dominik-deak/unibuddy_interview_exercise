@@ -360,4 +360,37 @@ export class MessageData {
 
     return chatMessageToObject(updatedResult);
   }
+
+  // New functions for tagging feature
+
+  async addTags(
+    messageId: ObjectID,
+    tags: string[],
+  ): Promise<ChatMessageModel> {
+    const message = await this.chatMessageModel.findById(messageId);
+    if (!message) throw new Error('Message not found');
+
+    message.tags.push(...tags);
+    await message.save();
+    return chatMessageToObject(message);
+  }
+
+  async updateTags(
+    messageId: ObjectID,
+    tags: string[],
+  ): Promise<ChatMessageModel> {
+    const message = await this.chatMessageModel.findById(messageId);
+    if (!message) throw new Error('Message not found');
+
+    message.tags = tags;
+    await message.save();
+    return chatMessageToObject(message);
+  }
+
+  async searchMessagesByTags(tags: string[]): Promise<ChatMessageModel[]> {
+    const messages = await this.chatMessageModel.find({
+      tags: { $in: tags },
+    });
+    return messages.map(chatMessageToObject);
+  }
 }

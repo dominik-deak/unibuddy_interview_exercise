@@ -1,25 +1,25 @@
-import { ConversationLogic } from './../conversation/conversation.logic';
 import { Ability, subject } from '@casl/ability';
-import { ChatMessageModel } from '../message/models/message.model';
+import { Test, TestingModule } from '@nestjs/testing';
+import { ObjectId } from 'mongodb';
+import { IAuthenticatedUser } from '../authentication/jwt.strategy';
 import {
   ContextSchema,
   ContextType,
   Product,
 } from '../conversation/models/ContextSchema.dto';
 import { ChatConversationModel } from '../conversation/models/conversation.model';
-import { AbilityFactory } from './ability-factory';
-import { AccountRole, Action, Subject } from './models/permissions.model';
-import { ObjectId } from 'mongodb';
+import { ChatMessageModel } from '../message/models/message.model';
+import {
+  UserBlockDTo,
+  UserBlockScope,
+} from '../user-blocks/models/user-blocks.model';
 import {
   IUserBlocksLogic,
   UserBlocksLogic,
 } from '../user-blocks/user-blocks.logic';
-import { Test, TestingModule } from '@nestjs/testing';
-import { IAuthenticatedUser } from '../authentication/jwt.strategy';
-import {
-  UserBlockScope,
-  UserBlockDTo,
-} from '../user-blocks/models/user-blocks.model';
+import { ConversationLogic } from './../conversation/conversation.logic';
+import { AbilityFactory } from './ability-factory';
+import { AccountRole, Action, Subject } from './models/permissions.model';
 
 const mockUser: IAuthenticatedUser = {
   userId: new ObjectId('597cfa3ac88c22000a74d222'),
@@ -361,18 +361,22 @@ describe('AbilityFactory', () => {
       permissions: [],
       lastMessageId: new ObjectId(),
     };
+
     const mockMessage: ChatMessageModel = {
       id: new ObjectId(),
-      text: 'hello peeps',
+      text: 'Hello World',
       created: new Date(),
-      sender: { id: String(senderId) },
-      senderId,
-      conversationId,
+      sender: { id: new ObjectId().toHexString() },
+      senderId: new ObjectId(),
+      conversationId: new ObjectId(),
       deleted: false,
       resolved: false,
-      conversation: { id: String(conversationId) },
       likes: [],
       likesCount: 0,
+      tags: [], // added tags field
+      conversation: {
+        id: '1d0c5369-85c2-5135-bec1-21ec4c2d6b8e', // random GUID
+      },
     };
 
     it('returns an empty set of abilities if the permissions array is empty', async () => {
@@ -564,9 +568,11 @@ describe('AbilityFactory', () => {
     });
 
     it('should return empty permissions array if user is blocked', async () => {
-      jest.spyOn(userBlocksLogic, 'isUserBlocked').mockImplementation(async () => {
-        return true
-      });
+      jest
+        .spyOn(userBlocksLogic, 'isUserBlocked')
+        .mockImplementation(async () => {
+          return true;
+        });
 
       const ability = await abilityFactory.factory(
         mockUser,
@@ -578,6 +584,59 @@ describe('AbilityFactory', () => {
       );
 
       expect(ability).toEqual([]);
+    });
+
+    it('Message permissions does replace message.senderId when there is a message, and the user can perform the action', async () => {
+      const ability = await abilityFactory.factory(
+        validUser,
+        mockConversation,
+        mockMessage,
+      );
+
+      expect(ability).toEqual([
+        {
+          action: 'readConversation',
+          conditions: {
+            userId: {
+              $eq: validUser.userId.toHexString(),
+            },
+          },
+          subject: 'User',
+        },
+      ]);
+    });
+
+    it('returns a set of abilities', async () => {
+      const ability = await abilityFactory.factory(
+        validUser,
+        mockConversation,
+        mockMessage,
+      );
+
+      expect(ability).toEqual([
+        {
+          action: 'manage',
+          subject: 'all',
+        },
+        {
+          action: 'readConversation',
+          conditions: {
+            userId: {
+              $eq: validUser.userId.toHexString(),
+            },
+          },
+          subject: 'User',
+        },
+        {
+          action: 'updateMessage',
+          conditions: {
+            userId: {
+              $eq: validUser.userId.toHexString(),
+            },
+          },
+          subject: 'User',
+        },
+      ]);
     });
   });
 });

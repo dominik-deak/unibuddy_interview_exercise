@@ -1,22 +1,26 @@
 import {
-  Delete,
-  Param,
-  Put,
-  Get,
   Body,
-  Query,
   Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
   Post,
-  UseGuards,
+  Put,
+  Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiSecurity, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { HttpCode } from '@nestjs/common';
+import { ApiBody, ApiResponse, ApiSecurity } from '@nestjs/swagger';
 
+import { Response } from 'express';
 import { XApiKeyGuard } from '../authentication/XApiKeyGuard';
-import { ConversationLogic } from './conversation.logic';
+import { IMigrationsConfig } from '../configuration/configuration';
+import { isDateDifferenceWithin7Days } from '../message/utils/message.helper';
 import { ConversationMigrationLogic } from '../migrations/conversation/conversation.migration.logic';
+import { ConversationLogic } from './conversation.logic';
+import { DirectChatConversationDto } from './dto/DirectChatConversationDto';
 import { AddMemberDTO } from './models/AddMember.dto';
 import { ChatConversation } from './models/ChatConversation.entity';
 import {
@@ -24,16 +28,12 @@ import {
   Tag,
 } from './models/CreateChatConversation.dto';
 import { BlockUserDTO } from './models/blockUser.dto';
-import { MigratePermissionsDTO } from './models/migratePermissions.dto';
-import { UnreadCountInput, UnreadCountOutput } from './models/unreadCount.dto';
-import { IMigrationsConfig } from '../configuration/configuration';
-import { DirectChatConversationDto } from './dto/DirectChatConversationDto';
 import {
   MessageGroupedByConversationOutput,
   MessagesFilterInput,
 } from './models/messagesFilterInput';
-import { isDateDifferenceWithin7Days } from '../message/utils/message.helper';
-import { Response } from 'express';
+import { MigratePermissionsDTO } from './models/migratePermissions.dto';
+import { UnreadCountInput, UnreadCountOutput } from './models/unreadCount.dto';
 
 @Controller('conversation')
 export class ConversationController {
